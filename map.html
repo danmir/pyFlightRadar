@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        html, body, #map-canvas {
+            height: 100%;
+            margin: 0px;
+            padding: 0px
+        }
+
+        #infoWindow {
+            width: 150px;
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=drawing"></script>
+    <script>
+        var map;
+        var marker;
+        var markersArray = {};
+        var count = 0;
+
+        function initialize() {
+            var mapOptions = {
+                center: new google.maps.LatLng(37.5, -122.2),
+                zoom: 10,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            };
+
+            map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
+
+            google.maps.event.addListener(map, 'dragend', function() {
+                self.print_center(map.getCenter().lat(), map.getCenter().lng());
+
+                var lat_lng_bounds_ne = map.getBounds().getNorthEast();
+                var lat_lng_bounds_sw = map.getBounds().getSouthWest();
+                lat_lng_bounds_ne_lat = lat_lng_bounds_ne.lat();
+                lat_lng_bounds_ne_lon = lat_lng_bounds_ne.lng();
+                lat_lng_bounds_sw_lat = lat_lng_bounds_sw.lat();
+                lat_lng_bounds_sw_lon = lat_lng_bounds_sw.lng();
+                self.print_bounds(lat_lng_bounds_ne_lat, lat_lng_bounds_ne_lon, lat_lng_bounds_sw_lat, lat_lng_bounds_sw_lon);
+                self.load_aircrafts_by_bounds(lat_lng_bounds_ne_lat, lat_lng_bounds_ne_lon, lat_lng_bounds_sw_lat, lat_lng_bounds_sw_lon);
+            });
+
+            google.maps.event.addListenerOnce(map, 'tilesloaded', function(){
+                // do something only the first time the map is loaded
+                var lat_lng_bounds_ne = map.getBounds().getNorthEast();
+                var lat_lng_bounds_sw = map.getBounds().getSouthWest();
+                lat_lng_bounds_ne_lat = lat_lng_bounds_ne.lat();
+                lat_lng_bounds_ne_lon = lat_lng_bounds_ne.lng();
+                lat_lng_bounds_sw_lat = lat_lng_bounds_sw.lat();
+                lat_lng_bounds_sw_lon = lat_lng_bounds_sw.lng();
+                self.load_aircrafts_by_bounds(lat_lng_bounds_ne_lat, lat_lng_bounds_ne_lon, lat_lng_bounds_sw_lat, lat_lng_bounds_sw_lon);
+                self.loaded_complete();
+            });
+
+        }
+
+        function repaint_by_hand(){
+            google.maps.event.trigger(map, "dragend");
+        }
+
+        function clearOverlays() {
+            // alert("clearOverlays started");
+            // alert(Object.keys(markersArray).length);
+            for (var prop in markersArray) {
+                if (markersArray.hasOwnProperty(prop)) {
+                    markersArray[prop].setMap(null);
+                    google.maps.event.clearListeners(markersArray[prop], 'click');
+                    delete markersArray[prop];
+                }
+            }
+            google.maps.event.clearListeners(map, 'click');
+            // alert("clearOverlays finish");
+            // alert(Object.keys(markersArray).length);
+        }
+
+        function changeMarkerPos(flight_id, lat, lng, track) {
+            var latlng = new google.maps.LatLng(lat, lng);
+            markersArray[flight_id].setPosition(latlng);
+            var my_icon = {
+                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                scale: 3,
+                //url: 'plane1.svg',
+                rotation: track //this is how to rotate the pointer
+            };
+            markersArray[flight_id].setIcon(my_icon);
+        }
+
+        function removeMarker(flight_id) {
+            markersArray[flight_id].setMap(null);
+        }
+
+        function setInfoWindowContent(flight_id, data_label) {
+            infowindow = markersArray[flight_id]["infowindow"];
+            data_label = JSON.parse(data_label);
+
+            data = '<div id="infoWindow">';
+            data += "<b>" + "Flight id: " + "</b>" + flight_id + "<br>";
+            data += "<b>" + "Flight: " + "</b>" + data_label["flight"] + "<br>";
+            data += "<b>" + "To: " + "</b>" + data_label["to_iata"] + "<br>";
+            data += data_label["to_city"] + "<br>";
+            data += "<b>" + "From: " + "</b>" + data_label["from_iata"] + "<br>";
+            data += data_label["from_city"] + "<br>";
+            data += "<b>" + "Airline: " + "</b>" + data_label["airline"] + "<br>";
+            data += "<b>" + "Aircraft: " + "</b>" + data_label["aircraft"] + "<br>";
+            data += '</div>';
+            // data = data_label + "<br>" + flight_id;
+            infowindow.setContentHTML(data);
+        }
+
+
+        function addMarker(lat, lng, track, data_label, flight_id) {
+            count ++;
+            var myLatLng = new google.maps.LatLng(lat, lng);
+            var my_icon = {
+                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                scale: 3,
+                //url: 'plane1.svg',
+                //scale: 0.1
+                rotation: track //this is how to rotate the pointer
+            };
+
+            var marker = new google.maps.Marker({
+                position: myLatLng,
+                icon: my_icon,
+                draggable: false,
+                map: map
+            });
+
+            // Setting InfoWindow for marker
+            data_label = JSON.parse(data_label);
+            data = '<div id="infoWindow">';
+            data += "<b>" + "Flight id: " + "</b>" + flight_id + "<br>";
+            data += "<b>" + "Flight: " + "</b>" + data_label["flight"] + "<br>";
+            data += "<b>" + "To: " + "</b>" + data_label["to_iata"] + "<br>";
+            data += data_label["to_city"] + "<br>";
+            data += "<b>" + "From: " + "</b>" + data_label["from_iata"] + "<br>";
+            data += data_label["from_city"] + "<br>";
+            data += "<b>" + "Airline: " + "</b>" + data_label["airline"] + "<br>";
+            data += "<b>" + "Aircraft: " + "</b>" + data_label["aircraft"] + "<br>";
+            data += '</div>';
+
+            var infowindow = new google.maps.InfoWindow({
+                content: data
+            });
+            // marker["infowindow"] = infowindow;
+            google.maps.event.addListener(marker, 'click', function() {
+                infowindow.open(map,marker);
+            });
+            google.maps.event.addListener(map, 'click', function() {
+                infowindow.close();
+            });
+
+            markersArray[flight_id] = marker;
+
+        }
+
+        function show_marker_by_flight_id(flight_id){
+            // We have to wait until mult. thread downloader of the planes done his work. Otherwise we have got nothing in markersArray
+            // Of course it might be done more wisely. We have to triger it after all downdloading comleted
+            // But for now just wait one second and hope that it is downloaded
+            setTimeout (function() {google.maps.event.trigger(markersArray[flight_id], "click")}, 1000);
+        }
+
+        google.maps.event.addDomListener(window, 'load', initialize);
+        //google.maps.event.addDomListener(window, 'idle', hey());
+
+    </script>
+</head>
+<body>
+<div id="map-canvas"></div>
+</body>
+</html>

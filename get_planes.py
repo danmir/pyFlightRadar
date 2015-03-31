@@ -39,6 +39,7 @@ class FlightRadarAPI():
         except requests.exceptions.Timeout:
             print("Timeout")
             return
+        # print(data)
         return data.json()
 
     def choose_server(self, load_balancer_options):
@@ -93,7 +94,7 @@ class FlightRadarAPI():
             return "No such flight"
 
     def get_aircrafts_by_zone(self, zone):
-        self._aircrafts_link = "http://{}/zones/{}_all.json".format(self.server_data_link, zone)
+        self._aircrafts_link = "http://{}/zones/fcgi/{}_all.json".format(self.server_data_link, zone)
         return self.parce_json(self._aircrafts_link)
 
     def get_zone_by_coord(self, lon, lat):
